@@ -1,0 +1,47 @@
+On branch master
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   lib/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/config/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/config/__pycache__/config.cpython-37.pyc
+	modified:   lib/config/__pycache__/yacs.cpython-37.pyc
+	modified:   lib/config/config.py
+	modified:   lib/datasets/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/datasets/__pycache__/collate_batch.cpython-37.pyc
+	modified:   lib/datasets/__pycache__/make_dataset.cpython-37.pyc
+	modified:   lib/datasets/__pycache__/samplers.cpython-37.pyc
+	modified:   lib/datasets/__pycache__/transforms.cpython-37.pyc
+	modified:   lib/evaluators/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/evaluators/__pycache__/make_evaluator.cpython-37.pyc
+	modified:   lib/networks/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/networks/__pycache__/body_model.cpython-37.pyc
+	modified:   lib/networks/__pycache__/cVAE.cpython-37.pyc
+	modified:   lib/networks/__pycache__/embedder.cpython-37.pyc
+	modified:   lib/networks/__pycache__/lbs.cpython-37.pyc
+	modified:   lib/networks/__pycache__/make_network.cpython-37.pyc
+	modified:   lib/networks/__pycache__/nerf_net_utils.cpython-37.pyc
+	modified:   lib/networks/__pycache__/nerf_renderer.cpython-37.pyc
+	modified:   lib/networks/cVAE.py
+	modified:   lib/networks/embedder.py
+	modified:   lib/train/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/train/__pycache__/optimizer.cpython-37.pyc
+	modified:   lib/train/__pycache__/recorder.cpython-37.pyc
+	modified:   lib/train/__pycache__/scheduler.cpython-37.pyc
+	modified:   lib/train/trainers/__pycache__/__init__.cpython-37.pyc
+	modified:   lib/train/trainers/__pycache__/make_trainer.cpython-37.pyc
+	modified:   lib/train/trainers/__pycache__/network_wrapper.cpython-37.pyc
+	modified:   lib/train/trainers/__pycache__/trainer.cpython-37.pyc
+	modified:   lib/utils/__pycache__/net_utils.cpython-37.pyc
+	modified:   lib/utils/__pycache__/write_ply.cpython-37.pyc
+	modified:   lib/utils/optimizer/__pycache__/lr_scheduler.cpython-37.pyc
+	modified:   lib/utils/optimizer/__pycache__/radam.cpython-37.pyc
+	modified:   test2.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.vscode/
+	data/
+	git.txt
+
+no changes added to commit (use "git add" and/or "git commit -a")
