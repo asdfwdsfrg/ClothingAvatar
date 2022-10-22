@@ -1,6 +1,6 @@
 import torch
-from lib.utils.optimizer.radam import RAdam
 
+from lib.utils.optimizer.radam import RAdam
 
 _optimizer_factory = {
     'adam': torch.optim.Adam,

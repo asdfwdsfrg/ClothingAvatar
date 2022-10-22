@@ -1,9 +1,9 @@
 task: 'StructureNeRF'
-gpus: [2]
+gpus: [1]
 # mod: 'train'
 # mod: 'test'
 mod: 'train'
-exp_name : '2048rays_novel_view'
+exp_name : '2048rays_novel_view_conv'
 # resume : 'True'
 train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
 train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
@@ -39,7 +39,7 @@ test_dataset:
     split: 'test'
 
 train:
-    batch_size: 1
+    batch_size: 4
     collator: ''
     lr: 5e-4
     weight_decay: 0
@@ -58,7 +58,7 @@ test:
 n_nodes: 128
 ep_iter: 500
 save_ep: 10
-eval_ep: 1000
+eval_ep: 10
 
 vertices: 'new_vertices'
 params: 'new_params'
@@ -80,7 +80,7 @@ lambda_ebd: 0.1
 lambda_kl: 0.00001
 N_samples: 64
 N_importance: 128
-N_rand: 2048
+N_rand: 1024
 L_rate: 0.0005
 beta1: 0.9
 beta2: 0.999
@@ -96,7 +96,7 @@ H: 1024
 W: 1024
 ratio: 0.5
 training_view: [0, 6, 12, 18]
-num_train_frame: 60
+num_train_frame: 300
 test_novel_pose: 'False'
 num_novel_pose_frame: 300
 smpl: 'smpl'

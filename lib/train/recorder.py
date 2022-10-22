@@ -91,9 +91,9 @@ class Recorder(object):
             else:
                 self.writer.add_scalar(pattern.format(k), v, step)
 
-        if self.processor is None:
-            return
-        image_stats = self.processor(image_stats) if image_stats else self.image_stats
+        # if self.processor is None: I don't know what it is
+            # return
+        image_stats = image_stats if image_stats else self.image_stats
         for k, v in image_stats.items():
             self.writer.add_image(pattern.format(k), v, step)
 

@@ -51,7 +51,7 @@ Rh = data['R']
 Th = data['Th']
 betas = np.squeeze(betas, axis = 0)
 # poses = np.squeeze(poses, axis = 0)
-s_p = os.path.join('ply/test.ply')
+# s_p = os.path.join('ply/test.ply')
 def to_cuda(batch, device):
     for k in batch:
         if k == 'meta':
@@ -71,7 +71,6 @@ net_wrapper = NetworkWrapper(network)
 ret, loss, scalar_stat, image_stat = net_wrapper(to_cuda(data, device))
 print(scalar_stat)
 
-# wpts, zvals = renderer.get_sampling_points(ray_o, ray_d, near, far)
 # nodes_T = body.basis['v_shaped'][body.basis['nodes_ind']]
 # batch_nodes = nodes_T.unsqueeze(dim = 0)
 # nodes_weights = body.basis['weights'][body.basis['nodes_ind']]

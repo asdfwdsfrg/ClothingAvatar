@@ -1,15 +1,18 @@
+import copy
+import datetime
 import os
 import time
-import datetime
+
 import numpy as np
 import torch
 import tqdm
+from line_profiler import LineProfiler
+from torch.distributions import Normal, kl_divergence
 from torch.nn import DataParallel
-import copy
+
 from lib.config import cfg
 from lib.networks import nerf_renderer
 from lib.networks.body_model import BodyModel
-from torch.distributions import Normal, kl_divergence
 
 
 class Trainer(object):
@@ -68,6 +71,7 @@ class Trainer(object):
             optimizer.zero_grad()
             loss = loss.mean()
             loss.backward()
+            #gradient clip
             torch.nn.utils.clip_grad_value_(self.network.parameters(), 40)
             optimizer.step()
 
@@ -99,7 +103,7 @@ class Trainer(object):
             if iteration % cfg.record_interval == 0 or iteration == (max_iter - 1):
                 # record loss_stats and image_dict
                 recorder.update_image_stats(image_stats)
-                recorder.record('train')
+                recorder.record('train', image_stats = image_stats) 
 
     def calculate_loss(self, ret, batch):
         img2mse = lambda x, y : torch.sum(torch.sum((x - y) ** 2, dim = 1),dim=0)
@@ -142,6 +146,7 @@ class Trainer(object):
         body = BodyModel(os.path.join('smpl_model'), 128, betas, gender = 'male', device = device)
         renderer = nerf_renderer.Renderer(network, body)        
         val_loss_stats = {}
+        data_size = len(data_loader)
         j = 0
         for batch in tqdm.tqdm(data_loader):
             j = j + 1
@@ -157,7 +162,12 @@ class Trainer(object):
                 r_size = batch['ray_o'].shape[1]
                 for i in range(0, r_size, 2048):
                     minibatch = self.batch_slice(batch, i, 2048)
+                    # lp = LineProfiler()
+                    # lp.add_function(network.forward)
+                    # lp_wrapper = lp(renderer.render)
                     o_i = renderer.render(minibatch)
+                    # o_i = lp_wrapper(minibatch)
+                    # lp.print_stats()
                     o['rgb_map'].append(o_i['rgb_map'])
                     o['mean'].append(o_i['mean'])
                     o['std'].append(o_i['std'])
@@ -184,7 +194,7 @@ class Trainer(object):
 # 
         if evaluator is not None:
             result = evaluator.summarize()
-            val_loss_stats.update(result)
+            # val_loss_stats.update(result)
 
         if recorder:
             recorder.record('val', epoch, val_loss_stats, image_stats)

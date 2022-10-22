@@ -2,6 +2,7 @@ import torch
 from lib.config import cfg
 from lib.networks.body_model import BodyModel
 from .nerf_net_utils import *
+from line_profiler import LineProfiler
 from . import embedder
 import os
 
@@ -90,7 +91,12 @@ class Renderer:
         wpts, z_vals = self.get_sampling_points(ray_o, ray_d, near, far)
         #batchs X R_ray X N_sampled X 3
         #calculate color & density
+        # lp = LineProfiler()
+        # lp_wrapper = lp(self.net.forward) 
+        # c, d, ei, nodes_delta, mean, std = lp_wrapper(input, wpts, self.body)
         c, d, ei, nodes_delta, mean, std = self.net(input, wpts, self.body)
+        
+        # lp.print_stats()
         # volume rendering for each pixel
         n_batch, n_pixel = ray_o.shape[:2]
         c = c.view(-1, n_pixel, cfg.N_samples, 3)

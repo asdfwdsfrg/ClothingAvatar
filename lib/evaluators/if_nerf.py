@@ -1,9 +1,11 @@
-import numpy as np
-from lib.config import cfg
-from skimage.measure import compare_ssim
 import os
+
 import cv2
+import numpy as np
+from skimage.measure import compare_ssim
 from termcolor import colored
+
+from lib.config import cfg
 
 
 class Evaluator:

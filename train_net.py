@@ -1,13 +1,16 @@
-from lib.config import cfg,args
-from lib.networks import make_network
-from lib.train import make_trainer, make_optimizer, make_lr_scheduler, make_recorder, set_lr_scheduler
-from lib.datasets import make_data_loader
-from lib.utils.net_utils import load_model, save_model, load_network
-from lib.evaluators import make_evaluator
-import torch.multiprocessing
+import os
+
 import torch
 import torch.distributed as dist
-import os
+import torch.multiprocessing
+
+from lib.config import args, cfg
+from lib.datasets import make_data_loader
+from lib.evaluators import make_evaluator
+from lib.networks import make_network
+from lib.train import (make_lr_scheduler, make_optimizer, make_recorder,
+                       make_trainer, set_lr_scheduler)
+from lib.utils.net_utils import load_model, load_network, save_model
 
 if cfg.fix_random:
     torch.manual_seed(0)
@@ -57,7 +60,7 @@ def train(cfg, network):
                        last=True)
 
         if (epoch + 1) % cfg.eval_ep == 0:
-            trainer.val(epoch, val_loader, evaluator, recorder)
+            trainer.val(epoch, val_loader, network, evaluator, recorder)
     return network
 
 
@@ -65,11 +68,11 @@ def test(cfg, network):
     trainer = make_trainer(cfg, network)
     val_loader = make_data_loader(cfg, is_train=False)
     evaluator = make_evaluator(cfg)
-    model_dir = os.path.join('data/trained_model/StructureNeRF/2048rays/latest.pth')
+    model_dir = os.path.join('data/trained_model/StructureNeRF/2048rays_novel_view/latest.pth')
     trained_model = torch.load(model_dir)
     network.load_state_dict(trained_model['net'])
     epoch = trained_model['epoch'] + 1
-    trainer.val(epoch, val_loader, network, evaluator)
+    trainer.val(epoch, val_loader, network, evaluator = evaluator)
     return network
 
 

@@ -1,11 +1,14 @@
-import open3d as o3d
-from . import yacs
-from .yacs import CfgNode as CN
 import argparse
 import os
-import numpy as np
 import pprint
-from lib.networks.body_model import BodyModel 
+
+import numpy as np
+import open3d as o3d
+
+from lib.networks.body_model import BodyModel
+
+from . import yacs
+from .yacs import CfgNode as CN
 
 cfg = CN()
 
@@ -166,7 +169,7 @@ def make_cfg(args):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', type=int, default=0)
-parser.add_argument("--cfg_file", default="configs/zju_mocap_exp/387_2048rays_novel_view.yaml", type=str)
+parser.add_argument("--cfg_file", default="configs/zju_mocap_exp/387_1024rays_novel_view_conv.yaml", type=str)
 parser.add_argument('--test', action='store_true', dest='test', default=False)
 parser.add_argument("--type", type=str, default="")
 parser.add_argument('--det', type=str, default='')

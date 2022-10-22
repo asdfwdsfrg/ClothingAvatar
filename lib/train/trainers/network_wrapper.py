@@ -1,14 +1,15 @@
-import torch.nn as nn
-from lib.config import cfg
-import torch
-from lib.networks import nerf_renderer
-from torch.nn import KLDivLoss 
-from lib.networks.body_model import BodyModel
-from lib.train import make_optimizer
-import numpy as np
-from torch.distributions import Normal, kl_divergence
 import os
 
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.distributions import Normal, kl_divergence
+from torch.nn import KLDivLoss
+
+from lib.config import cfg
+from lib.networks import nerf_renderer
+from lib.networks.body_model import BodyModel
+from lib.train import make_optimizer
 
 
 class NetworkWrapper(nn.Module):
@@ -40,7 +41,7 @@ class NetworkWrapper(nn.Module):
         normal_t = Normal(0, 1)
 
         kl_loss = kl_divergence(normal_pred, normal_t)
-        kl_loss = torch.sum(kl_loss.view(-1, 1), dim = 0) 
+        kl_loss = torch.sum(kl_loss.reshape(-1, 1), dim = 0) 
         scalar_stats.update({'kl_loss': kl_loss})
         trans_loss = torch.norm(ret['delta_nodes']) ** 2
         scalar_stats.update({'trans_loss': trans_loss})
@@ -55,8 +56,6 @@ class NetworkWrapper(nn.Module):
             scalar_stats.update({'img_loss0': img_loss0})
             loss += img_loss0
 
-        mask_at_box = batch['mask_at_box']
-        image = ret['rgb_map'][mask_at_box]
         scalar_stats.update({'loss': loss})
-        image_stats.update({'image': image}) 
+        image_stats = {}
         return ret, loss, scalar_stats, image_stats

@@ -181,7 +181,6 @@ def lbs(betas, pose, v, shapedirs, posedirs, J, parents,
         v_posed = pose_offsets + v
     else:
         v_posed = v
-
     # 4. Get the global joint location
     J_transformed, A = batch_rigid_transform(rot_mats, J, parents, dtype=dtype)
     if inverse:
@@ -197,8 +196,9 @@ def lbs(betas, pose, v, shapedirs, posedirs, J, parents,
     homogen_shape[-1] = 1
     homogen_coord = torch.ones(homogen_shape, dtype=dtype, device=device)
     v_posed_homo = torch.cat([v_posed, homogen_coord], dim=-1)
+    
     v_homo = torch.matmul(T, torch.unsqueeze(v_posed_homo, dim=-1))
-    verts = v_homo[:, :, :3, 0]
+    verts = v_homo[..., :3, 0]
 
     return verts, J_transformed
 
