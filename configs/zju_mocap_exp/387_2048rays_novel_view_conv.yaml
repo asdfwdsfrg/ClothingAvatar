@@ -58,7 +58,7 @@ test:
 n_nodes: 128
 ep_iter: 500
 save_ep: 10
-eval_ep: 10
+eval_ep: 50
 
 vertices: 'new_vertices'
 params: 'new_params'

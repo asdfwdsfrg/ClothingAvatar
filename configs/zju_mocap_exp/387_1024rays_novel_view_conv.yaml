@@ -1,8 +1,8 @@
 task: 'StructureNeRF'
 gpus: [6]
 # mod: 'train'
-# mod: 'test'
-mod: 'train'
+mod: 'test'
+# mod: 'train'
 exp_name : '1024rays_novel_view_conv'
 resume : 'True'
 train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'

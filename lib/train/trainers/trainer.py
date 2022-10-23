@@ -35,7 +35,6 @@ class Trainer(object):
 
     def batch_slice(self, batch, from_i, mini_batch_size):
         minibatch = copy.deepcopy(batch)
-
         for k in batch:
             if k in ['ray_o', 'ray_d']:
                 minibatch[k] = batch[k][:,from_i : from_i + mini_batch_size, :]
@@ -60,13 +59,13 @@ class Trainer(object):
         max_iter = len(data_loader)
         self.network.train()
         end = time.time()
+
         for iteration, batch in enumerate(data_loader):
             data_time = time.time() - end
             iteration = iteration + 1
 
             batch = self.to_cuda(batch)
             output, loss, loss_stats, image_stats= self.network(batch)
-
             # training stage: loss; optimizer; scheduler
             optimizer.zero_grad()
             loss = loss.mean()
