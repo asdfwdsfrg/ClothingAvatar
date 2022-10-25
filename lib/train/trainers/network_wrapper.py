@@ -35,6 +35,7 @@ class NetworkWrapper(nn.Module):
         lambda_trans = cfg.lambda_trans 
         lambda_ebd = cfg.lambda_ebd
         lambda_kl = cfg.lambda_kl
+        #B X H x W x 3
         img_loss = self.img2mse(ret['rgb_map'][mask], batch['rgb'][mask])
         scalar_stats.update({'img_loss': img_loss})
         normal_pred = Normal(ret['mean'], ret['std'])

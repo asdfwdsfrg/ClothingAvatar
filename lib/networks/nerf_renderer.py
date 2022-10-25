@@ -121,7 +121,7 @@ class Renderer:
         keys = ret_list[0].keys()
         ret = {k: torch.cat([r[k] for r in ret_list], dim=1) for k in keys}
         ret['delta_nodes'] = nodes_delta.transpose(0, 1)
-        ret['embedding'] = ei.transpose(0,1 )
+        ret['embedding'] = ei.transpose(0,1)
         ret['mean'] = mean.transpose(0, 1)
         ret['std'] = std.transpose(0, 1)
         return ret

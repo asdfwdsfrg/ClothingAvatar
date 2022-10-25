@@ -1,5 +1,5 @@
 task: 'StructureNeRF'
-gpus: [6]
+gpus: [2]
 # mod: 'train'
 mod: 'test'
 # mod: 'train'
@@ -58,7 +58,7 @@ test:
 n_nodes: 128
 ep_iter: 500
 save_ep: 10
-eval_ep: 30
+eval_ep: 150
 
 vertices: 'new_vertices'
 params: 'new_params'

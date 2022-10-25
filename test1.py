@@ -1,26 +1,12 @@
-from platform import node
-from lib.train.trainers.network_wrapper import NetworkWrapper
-from lib.utils.write_ply import write_ply
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from lib.utils.vis_utils import plotSkel3D
 import numpy as np
-from sklearn import datasets
-from lib.config import cfg
-import os
-import cv2
-import torch
-from lib.datasets.light_stage.multi_view_dataset import Dataset
-from lib.config import cfg
-import json
-from lib.datasets.make_dataset import make_data_loader
 from torch.utils.data.dataloader import DataLoader
-from lib.networks import body_model
-from lib.networks.body_model import BodyModel
-from lib.networks.nerf_renderer import Renderer
-from lib.train.trainers.make_trainer import make_trainer
-from lib.visualizers.vis_3d import vis_3d
-from lib.networks.cVAE import Network 
+import cv2
+import os
+import torch
+
+
+from lib.datasets.light_stage.multi_view_dataset import Dataset
+
 
 kintree = {
     'kintree': [[1, 0], [2, 1], [3, 2], [4, 3], [5, 1], [6, 5], [7, 6], [8, 1],
@@ -33,16 +19,28 @@ kintree = {
     ]
 }
 
-cfg.local_rank = 0
-torch.cuda.set_device(0)
-device = torch.device('cuda:{}'.format(cfg.local_rank))
-dataset = Dataset(**cfg.train_dataset)
+data_root = 'data/zju_mocap/CoreView_313'
+human = 'CoreView_313'
+ann_file = 'data/zju_mocap/CoreView_313/annots.npy'
+split = 'test'
+
+
+
+dataset = Dataset(data_root, human, ann_file, split)
 data_loader = DataLoader(dataset, batch_size=1)
+result_dir = os.path.join('comparision')
+
 for batch in data_loader:
-    print(0)
+    image = np.ones([512, 512, 3])
+    rgb = batch['rgb'][0]
+    mask = batch['mask_at_box'][0].reshape(512,512)
+    frame_index = batch['frame_index'].item()
+    view_index = batch['cam_ind'].item()
+    image[mask] = rgb 
+    cv2.imwrite(
+        '{}/frame{:04d}_view{:04d}.png'.format(result_dir, frame_index,
+                                                view_index), (image[..., [2, 1, 0]] * 255))
 
-
-# data = next(iter(data_loader)) #从dataloader 取一个batch
 # ray_o = data['ray_o']
 # ray_d = data['ray_d']
 # near = data['near']

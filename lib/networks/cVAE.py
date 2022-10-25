@@ -3,7 +3,6 @@ from random import randrange
 from re import I
 from threading import local
 from xmlrpc.client import boolean
-import psutil
 
 import torch
 import torch.nn as nn
@@ -47,6 +46,7 @@ class Network(nn.Module):
 
         #NerF density
         self.d_ly1 = nn.Linear(256, 1)
+
     def encode(self, t_ped, pose):
         '''
         poses: batch x 72
@@ -80,11 +80,13 @@ class Network(nn.Module):
         #nodes x batches x (32, 3)
         return ei, delta_ni
     
-    def Feature_field(self, ei, local_coords, mask, mark, s):
+    def Feature_field(self, ei, local_coords, mask, mark, s, s_max):
         '''
         local_coords: nodes x B x V x 3
         ei:nodes x B x 32
         s: nodes x B 
+        return 
+            f:nodes x s_max x 256
         '''
         nodes_n = ei.shape[0]
         batch_size = ei.shape[1] 
@@ -92,8 +94,6 @@ class Network(nn.Module):
         ei = ei.permute(1, 2, 0, 3)
         # V x (32 + xyz_dim + 1)
         raw = torch.cat([ei, local_coords], dim = -1)[mask]
-        s = torch.sum(torch.sum(mask, dim = 2), dim = 1)
-        s_max = torch.max(s)
         if(s_max == 0):
             return torch.zeros(nodes_n, s_max, 256)
         #nodes_n X S' X (32 + xyz_dim)
@@ -108,6 +108,8 @@ class Network(nn.Module):
         output = self.actvn(self.f_ly4(net))
         f = output.view(nodes_n, 256 , s_max).permute(0, 2, 1)
         return f
+
+
     def GaussianSample(self, mean, std):
         #z: nodes x batchs x 8
         return torch.normal(mean, std)
@@ -132,6 +134,8 @@ class Network(nn.Module):
         c = self.c_ly2(netc)
         d = self.actvn(self.d_ly1(f))
         return c, d
+
+
     def pts_to_can_pts(self, pts, sp_input):
         """transform pts from the world coordinate to the smpl coordinate"""
         Th = sp_input['Th']
@@ -148,7 +152,6 @@ class Network(nn.Module):
                 bweights: nodes_n X B X V  the nodes influence on each vertex
                 mask: nodes x B X V  bool  knb[i][j] = 1 means Vj inside the nodes_i's influence range
         '''
-        
         mask = torch.zeros([nodes_posed.shape[1], wpts.shape[0], wpts.shape[1]], dtype=boolean, device = wpts.device)
         bweights = torch.zeros([nodes_posed.shape[1], wpts.shape[0], wpts.shape[1]], device = wpts.device)
         for i in range(nodes_posed.shape[1]):
@@ -157,6 +160,7 @@ class Network(nn.Module):
             mask[i] = nodes_influ.ge(0)
             bweights[i] = torch.max(nodes_influ, torch.tensor(0).float())
         return bweights, mask
+
     def calculate_local_coords(self, pts, nodes_T, nodes_delta, nodes_weights, J, body, poses, shapes, R, Th):
         """get local_coords"""
         '''
@@ -201,7 +205,10 @@ class Network(nn.Module):
         pts_nodes_ind = pts_nodes_ind.expand(batch_size, wpts.shape[1], cfg.n_nodes).permute(2, 0, 1)[mask]
         wpts_ep = wpts.expand(nodes_n, wpts.shape[0], wpts.shape[1], wpts.shape[2])
         #s[i]: the number of pts influenced by nodes_i
+        f = torch.zeros(nodes_n, batch_size, wpts.shape[-2], 256, device = wpts.device)
         s = torch.sum(torch.sum(mask, dim = 2), dim = 1)
+        s_max = torch.max(s)
+        
         #s: nodes_n x B the number of pts under the nodes' influence
         t_ped = time_embedder(input['latent_index']).view(batch_size,-1)
         mean, std = self.encode(t_ped, params['poses'])
@@ -213,15 +220,16 @@ class Network(nn.Module):
             z = mean
         #nodes x B x (32, 3)
         ei, nodes_delta = self.decode(z, params['poses'])  
+        if s_max == 0:
+            f_blend = self.blend_feature(bweights, f)
+            c, d = self.Nerf(f_blend)
+            return c, d, ei, nodes_delta, mean, std
+      
         #nodes_n x B x V x 3
         local_coords = self.calculate_local_coords(wpts_ep, batch_nodes_T, nodes_delta, nodes_weights, j_transformed, body, poses, shapes, R, Th) #TODO High complexity
         #n x b x v x 256
-        f = torch.zeros(nodes_n, batch_size, local_coords.shape[-2], 256, device = wpts.device)
-        if torch.max(s) == 0:
-            f_blend = self.blend_feature(bweights.to(f), f)
-            c, d = self.Nerf(f_blend)
-            return c, d, ei, nodes_delta, mean, std
-        f_hit = self.Feature_field(ei, xyz_embedder(local_coords), mask, pts_nodes_ind, s) #TODO high complexity 75%
+         #
+        f_hit = self.Feature_field(ei, xyz_embedder(local_coords), mask, pts_nodes_ind, s, s_max) #TODO high complexity 75%
         
         mask_f = torch.zeros(f_hit.shape[0], f_hit.shape[1], dtype=bool, device = f.device)
         for i, pts_num in enumerate(s):

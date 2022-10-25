@@ -29,7 +29,7 @@ def train(cfg, network):
                              scheduler,
                              recorder,
                              cfg.trained_model_dir,
-                             resume=cfg.resume) #恢复训练
+                             resume=cfg.resume) 
     set_lr_scheduler(cfg, scheduler)
 
     train_loader = make_data_loader(cfg,
@@ -61,6 +61,7 @@ def train(cfg, network):
 
         if (epoch + 1) % cfg.eval_ep == 0:
             trainer.val(epoch, val_loader, network, evaluator, recorder)
+            torch.cuda.empty_cache()
     return network
 
 
