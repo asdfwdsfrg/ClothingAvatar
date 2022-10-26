@@ -169,7 +169,7 @@ def make_cfg(args):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--local_rank', type=int, default=0)
-parser.add_argument("--cfg_file", default="configs/zju_mocap_exp/387_1024rays_novel_view_conv.yaml", type=str)
+parser.add_argument("--cfg_file", default="configs/zju_mocap_exp/387_60fps_conv.yaml", type=str)
 parser.add_argument('--test', action='store_true', dest='test', default=False)
 parser.add_argument("--type", type=str, default="")
 parser.add_argument('--det', type=str, default='')

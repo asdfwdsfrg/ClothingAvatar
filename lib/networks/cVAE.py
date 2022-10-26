@@ -34,6 +34,7 @@ class Network(nn.Module):
         self.actvn = nn.ReLU()
         self.actvn2 = nn.Sigmoid()  
         # nodes x s' x (32+xyz_dim)
+
         #feature field
         self.f_ly1 = nn.Conv1d((32 + xyz_dim) * 128, 64 * 128, kernel_size=1, groups = 128)
         self.f_ly2 = nn.Conv1d(64 * 128, 64 * 128, kernel_size=1, groups = 128)
@@ -47,34 +48,49 @@ class Network(nn.Module):
         #NerF density
         self.d_ly1 = nn.Linear(256, 1)
 
-    def encode(self, t_ped, pose):
+    def encode(self, t_ped, poses, w):
         '''
         poses: batch x 72
         t_ped: batch x time_dim
         mean, std:  Batchs x nodes x 8
+        w: attention_map : 128 x 24
         '''
-        #batchs x 73
-        encoder_in = torch.cat((torch.tensor(t_ped.expand(pose.shape[0], time_dim), dtype=pose.dtype), pose.view(-1, 72)), dim = -1)
+        batch_size = poses.shape[0]
+        nodes_n = cfg.n_nodes
+        #B x N_nodes x 24 X 3
+        w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
+        poses = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
+        #B x N_nodes x 72
+        poses = torch.mul(w, poses).view(batch_size,nodes_n,72)
+        #B x N_nodes x time_dim
+        t_ped = t_ped.expand(nodes_n, batch_size, time_dim).permute(1, 0, 2)
+        #B x N_nodes X (72 + time_dim)
+        encoder_in = torch.cat([poses, t_ped], dim = -1)
         #nodes x batchs x 64
-        net = [self.actvn(self.ec_ly1[node_i](encoder_in)) for node_i in range(cfg.n_nodes)]
+        net = [self.actvn(self.ec_ly1[node_i](encoder_in[:,node_i,:])) for node_i in range(cfg.n_nodes)]
         #nodes x batchs x 8 
         mean = torch.stack([self.ec_ly21[node_i](net[node_i]) for node_i in range(cfg.n_nodes)], dim = 0)
         std = torch.stack([(self.actvn2(self.ec_ly22[node_i](net[node_i]))) for node_i in range(cfg.n_nodes)], dim = 0)
         
         return mean, std
     
-    def decode(self, z, poses):
+    def decode(self, z, poses, w):
         '''
         poses: Batchs x 1 x 72
         z: nodes x Batchs x 8
         ei: Batchs x nodes x 32
         '''
-        #nodes x Batchs x 72
-        poses = torch.squeeze(poses).expand(cfg.n_nodes, poses.shape[0], poses.shape[-1])
-        #nodes x Batchs x 80
-        input = torch.cat([z, poses], dim = -1)
+        batch_size = poses.shape[0]
+        nodes_n = cfg.n_nodes
+        #B x N_nodes x 24 X 3
+        w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
+        poses = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
+        #B x N_nodes x 72
+        poses = torch.mul(w, poses).view(batch_size,nodes_n,72)
+        #B x N_nodes x 80
+        input = torch.cat([poses, z.transpose(0, 1)], dim = -1)
         #nodes x batchs x 64
-        net = [self.actvn(self.dc_ly1[node_i](input[node_i])) for node_i in range(cfg.n_nodes)]
+        net = [self.actvn(self.dc_ly1[node_i](input[:, node_i, :])) for node_i in range(cfg.n_nodes)]
         ei = torch.stack([self.dc_ly21[node_i](net[node_i]) for node_i in range(cfg.n_nodes)],dim = 0)
         delta_ni = torch.stack([self.dc_ly22[node_i](net[node_i]) for node_i in range(cfg.n_nodes)], dim = 0)
         #nodes x batches x (32, 3)
@@ -113,6 +129,7 @@ class Network(nn.Module):
     def GaussianSample(self, mean, std):
         #z: nodes x batchs x 8
         return torch.normal(mean, std)
+
     def blend_feature(self, bweights, f):
         '''
         bweights: nodes x B x V
@@ -135,7 +152,6 @@ class Network(nn.Module):
         d = self.actvn(self.d_ly1(f))
         return c, d
 
-
     def pts_to_can_pts(self, pts, sp_input):
         """transform pts from the world coordinate to the smpl coordinate"""
         Th = sp_input['Th']
@@ -143,6 +159,7 @@ class Network(nn.Module):
         R = sp_input['R']
         pts = torch.matmul(pts, R)
         return pts
+
     def blend_weights(self, wpts, nodes_posed):
         """feature blending weights"""    
         '''
@@ -186,16 +203,18 @@ class Network(nn.Module):
         wpts = wpts.view(batch_size, -1, 3)
         wpts = self.pts_to_can_pts(wpts, input)
         params = input['params']
-        poses = params['poses']
+        poses = params['poses'].squeeze(dim = -2)
         shapes = params['shapes']
         nodes_n = cfg.n_nodes
+        weights = body.basis['weights']
         R = input['R']
         Th = input['Th']
         nodes_ind = body.basis['nodes_ind']
         #nodes in T pose
         nodes_T = body.basis['v_shaped'][nodes_ind]
         batch_nodes_T = nodes_T.expand(batch_size, nodes_T.shape[-2], nodes_T.shape[-1])
-        nodes_weights = body.basis['weights'][nodes_ind]
+        nodes_weights = weights[nodes_ind]
+        w = torch.matmul(body.attention_map, nodes_weights[..., None]).squeeze(dim=-1)
         batch_nodes_posed, j_transformed = body.get_lbs(poses, shapes, nodes_weights, batch_nodes_T, Rh = R, Th = Th)
         #B X V X 3
         #bweights: nodes_n X B X V  the nodes influence on each vertex
@@ -211,7 +230,7 @@ class Network(nn.Module):
         
         #s: nodes_n x B the number of pts under the nodes' influence
         t_ped = time_embedder(input['latent_index']).view(batch_size,-1)
-        mean, std = self.encode(t_ped, params['poses'])
+        mean, std = self.encode(t_ped, poses, w)
         if self.training:
             z = self.GaussianSample(mean, std)
         elif cfg.mod == 'novel':
@@ -219,7 +238,7 @@ class Network(nn.Module):
         else:
             z = mean
         #nodes x B x (32, 3)
-        ei, nodes_delta = self.decode(z, params['poses'])  
+        ei, nodes_delta = self.decode(z, poses, w)  
         if s_max == 0:
             f_blend = self.blend_feature(bweights, f)
             c, d = self.Nerf(f_blend)
@@ -237,7 +256,7 @@ class Network(nn.Module):
         f_hit = f_hit[mask_f]
         f[mask] = f_hit
 
-        f_blend = self.blend_feature(bweights.to(f), f)
+        f_blend = self.blend_feature(bweights, f)
         #batchs x v x 3,1
         c, d = self.Nerf(f_blend)
         #ei, nodes_delta: nodes x batches x (32, 3)

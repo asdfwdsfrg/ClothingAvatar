@@ -4,47 +4,52 @@ import cv2
 import os
 import torch
 
+from lib.utils.write_ply import write_ply
 
-from lib.datasets.light_stage.multi_view_dataset import Dataset
+from lib.datasets.light_stage.multi_view_dataset_msk import Dataset
 
 
-kintree = {
-    'kintree': [[1, 0], [2, 1], [3, 2], [4, 3], [5, 1], [6, 5], [7, 6], [8, 1],
+kintree =  [[1, 0], [2, 1], [3, 2], [4, 3], [5, 1], [6, 5], [7, 6], [8, 1],
                 [9, 8], [10, 9], [11, 10], [12, 8], [13, 12], [14, 13],
                 [15, 0], [16, 0], [17, 15], [18, 16], [19, 14], [20, 19],
-                [21, 14], [22, 11], [23, 22], [24, 11]],
-    'color': [
-        'k', 'r', 'r', 'r', 'b', 'b', 'b', 'k', 'r', 'r', 'r', 'b', 'b', 'b',
-        'y', 'y', 'y', 'y', 'b', 'b', 'b', 'r', 'r', 'r'
-    ]
-}
+                [21, 14], [22, 11], [23, 22], [24, 11]]
 
-data_root = 'data/zju_mocap/CoreView_313'
-human = 'CoreView_313'
-ann_file = 'data/zju_mocap/CoreView_313/annots.npy'
+distance = np.array(25, 25)
+for i in range(0, 24):
+    for j in range(0, 24):
+        
+
+data_root = 'data/zju_mocap/CoreView_387'
+human = 'CoreView_387'
+ann_file = 'data/zju_mocap/CoreView_387/annots.npy'
 split = 'test'
 
 
 
 dataset = Dataset(data_root, human, ann_file, split)
 data_loader = DataLoader(dataset, batch_size=1)
-result_dir = os.path.join('comparision')
 
-for batch in data_loader:
-    image = np.ones([512, 512, 3])
+result_dir = os.path.join('comparision')
+pth1 = os.path.join('ply/ray_o.ply')
+pth2 = os.path.join('ply/ray_d.ply')
+for i, batch in enumerate(data_loader):
+    image = torch.ones([512, 512, 3])
     rgb = batch['rgb'][0]
-    mask = batch['mask_at_box'][0].reshape(512,512)
+    ray_o = batch['ray_o'][0]
+    ray_d = batch['ray_d'][0]
+    near = batch['near']
+    far = batch['far']
     frame_index = batch['frame_index'].item()
-    view_index = batch['cam_ind'].item()
-    image[mask] = rgb 
-    cv2.imwrite(
-        '{}/frame{:04d}_view{:04d}.png'.format(result_dir, frame_index,
-                                                view_index), (image[..., [2, 1, 0]] * 255))
+    m = batch['msk'][0].reshape(512,512)
+    image[m] = rgb
+    cv2.imwrite('a.png', image.detach().numpy()[..., [2, 1, 0]] * 255)
+     
+
+    
+            # np.savetxt('mask{}.txt'.format(i), mask)
 
 # ray_o = data['ray_o']
 # ray_d = data['ray_d']
-# near = data['near']
-# far = data['far']
 # sh = ray_o.shape #wpts: batchs x ray_o x N_sampled x 3
 # max_range = 1
 # poses = data['params']['poses']

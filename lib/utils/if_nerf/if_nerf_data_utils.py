@@ -106,6 +106,7 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
         far_list = []
         coord_list = []
         mask_at_box_list = []
+        msk_list = []
 
         while nsampled_rays < nrays:
             n_body = int((nrays - nsampled_rays) * body_sample_ratio)
@@ -122,7 +123,9 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
                 coord_face = coord_face[np.random.randint(
                     0, len(coord_face), n_face)]
             # sample rays in the bound mask
-            coord = np.argwhere(bound_mask == 1)
+
+            # sample rays in msk
+            coord = np.argwhere(msk != 0)
             coord = coord[np.random.randint(0, len(coord), n_rand)]
 
             if len(coord_face) > 0:
@@ -133,6 +136,7 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
             ray_o_ = ray_o[coord[:, 0], coord[:, 1]]
             ray_d_ = ray_d[coord[:, 0], coord[:, 1]]
             rgb_ = img[coord[:, 0], coord[:, 1]]
+            msk_ = msk[coord[:, 0], coord[:, 1]]
 
             near_, far_, mask_at_box = get_near_far(bounds, ray_o_, ray_d_)
 
@@ -143,6 +147,7 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
             far_list.append(far_)
             coord_list.append(coord[mask_at_box])
             mask_at_box_list.append(mask_at_box[mask_at_box])
+            msk_list.append(msk_[mask_at_box])
             nsampled_rays += len(near_)
 
         ray_o = np.concatenate(ray_o_list).astype(np.float32)
@@ -152,19 +157,23 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
         far = np.concatenate(far_list).astype(np.float32)
         coord = np.concatenate(coord_list)
         mask_at_box = np.concatenate(mask_at_box_list)
+        msk = np.concatenate(msk_list)
+
     else:
         rgb = img.reshape(-1, 3).astype(np.float32)
+        msk = msk.flatten().astype(np.bool8)
         ray_o = ray_o.reshape(-1, 3).astype(np.float32)
         ray_d = ray_d.reshape(-1, 3).astype(np.float32)
         near, far, mask_at_box = get_near_far(bounds, ray_o, ray_d)
         near = near.astype(np.float32)
         far = far.astype(np.float32)
-        rgb = rgb[mask_at_box]
-        ray_o = ray_o[mask_at_box]
-        ray_d = ray_d[mask_at_box]
+        rgb = rgb[msk]
+        ray_o = ray_o[msk]
+        ray_d = ray_d[msk]
         coord = np.zeros([len(rgb), 2]).astype(np.int64)
 
-    return rgb, ray_o, ray_d, near, far, coord, mask_at_box
+    return rgb, ray_o, ray_d, near, far, coord, mask_at_box, msk
+
 
 
 def sample_ray_h36m(img, msk, K, R, T, bounds, nrays, split):
@@ -204,6 +213,9 @@ def sample_ray_h36m(img, msk, K, R, T, bounds, nrays, split):
                 coord_face = coord_face[np.random.randint(
                     0, len(coord_face), n_face)]
             # sample rays in the bound mask
+            coord = np.argwhere(bound_mask == 1)
+
+            # sample rays in the msk
             coord = np.argwhere(bound_mask == 1)
             coord = coord[np.random.randint(0, len(coord), n_rand)]
 

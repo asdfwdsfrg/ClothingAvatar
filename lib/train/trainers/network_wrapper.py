@@ -30,7 +30,7 @@ class NetworkWrapper(nn.Module):
         scalar_stats = {}
         image_stats = {}
         loss = 0
-        mask = batch['mask_at_box']
+        mask = batch['msk']
         lambda_img_loss = cfg.lambda_img_loss
         lambda_trans = cfg.lambda_trans 
         lambda_ebd = cfg.lambda_ebd
@@ -49,14 +49,7 @@ class NetworkWrapper(nn.Module):
         ebd_loss = torch.norm(ret['embedding']) ** 2
         scalar_stats.update({'ebd_loss': ebd_loss})
         
-        
         loss += lambda_img_loss * img_loss + lambda_ebd * ebd_loss + lambda_kl * kl_loss + lambda_trans * trans_loss
-
-        if 'rgb0' in ret:
-            img_loss0 = self.img2mse(ret['rgb0'], batch['rgb'])
-            scalar_stats.update({'img_loss0': img_loss0})
-            loss += img_loss0
-
         scalar_stats.update({'loss': loss})
         image_stats = {}
         return ret, loss, scalar_stats, image_stats

@@ -7,6 +7,7 @@ from .lbs import batch_rodrigues, lbs
 import os.path as osp
 import pickle
 import numpy as np
+from lib.utils.caculate_attention_map import cal_attention_map
 
 
 def to_tensor(array, dtype=torch.float32, device=torch.device('cpu')):
@@ -64,6 +65,7 @@ class BodyModel(object):
         v_shaped = self.basis['v_template'] + blend_shapes(betas,self.basis['shapedirs'])
         self.basis['v_shaped'] = v_shaped.squeeze()
         # self.farest_point_sampling(n_nodes, self.basis['v_shaped'])
+        self.attention_map = torch.from_numpy(cal_attention_map(self.basis['parents'])).to(self.device)
         nodes_path = os.path.join('nodes_T.npy')
         self.basis['nodes_ind'] = torch.from_numpy(np.sort(np.load(nodes_path)))
         self.basis['J_shaped'] = vertices2joints(self.basis['J_regressor'], v_shaped)

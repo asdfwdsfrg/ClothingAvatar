@@ -101,18 +101,6 @@ class Dataset(data.Dataset):
             max_xyz[2] += 0.05
         bounds = np.stack([min_xyz, max_xyz], axis=0)
 
-        # construct the coordinate
-        # dhw = xyz[:, [2, 1, 0]]
-        # min_dhw = min_xyz[[2, 1, 0]]
-        # max_dhw = max_xyz[[2, 1, 0]]
-        # voxel_size = np.array(cfg.voxel_size)
-        # coord = np.round((dhw - min_dhw) / voxel_size).astype(np.int32)
-
-        # # construct the output shape
-        # out_sh = np.ceil((max_dhw - min_dhw) / voxel_size).astype(np.int32)
-        # x = 32
-        # out_sh = (out_sh | (x - 1)) + 1
-
         return xyz, params, can_bounds, bounds, Rh, Th
 
     def __getitem__(self, index):
@@ -160,7 +148,9 @@ class Dataset(data.Dataset):
             'ray_d': ray_d,
             'near': near,
             'far': far,
-            'mask_at_box': mask_at_box
+            'mask_at_box': mask_at_box,
+            'img': img,
+            'msk':msk
         }
 
         R = cv2.Rodrigues(Rh)[0].astype(np.float32)

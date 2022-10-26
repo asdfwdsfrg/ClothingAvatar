@@ -33,7 +33,7 @@ class Renderer:
     def prepare_input(self, batch):
         sp_input = {}
 
-        sh = batch['coord'].shape
+        sh = batch['rgb'].shape
         # idx = [torch.full([sh[1]], i) for i in range(sh[0])] 
         # idx = torch.cat(idx).to(batch['coord'])
         # coord = batch['coord'].view(-1, sh[-1])
