@@ -96,7 +96,7 @@ class Renderer:
         
         # lp_wrapper = lp(self.net.forward) 
         # c, d, ei, nodes_delta, mean, std = lp_wrapper(input, wpts, self.body)
-        c, d, ei, nodes_delta, mean, std = self.net(input, wpts, self.body)
+        c, d, ei, nodes_delta, mean, logvar= self.net(input, wpts, self.body)
         
         # lp.print_stats()
         # volume rendering for each pixel
@@ -123,5 +123,5 @@ class Renderer:
         ret['delta_nodes'] = nodes_delta.transpose(0, 1)
         ret['embedding'] = ei.transpose(0,1)
         ret['mean'] = mean.transpose(0, 1)
-        ret['std'] = std.transpose(0, 1)
+        ret['logvar'] = logvar.transpose(0, 1)
         return ret

@@ -150,7 +150,7 @@ class Dataset(data.Dataset):
             'far': far,
             'mask_at_box': mask_at_box,
             'img': img,
-            'msk':msk
+            'msk':mask_at_box
         }
 
         R = cv2.Rodrigues(Rh)[0].astype(np.float32)

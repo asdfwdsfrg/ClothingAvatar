@@ -139,14 +139,14 @@ class Dataset(data.Dataset):
 
         rgb, ray_o, ray_d, near, far, coord_, mask_at_box, msk = if_nerf_dutils.sample_ray(
             img, msk, K, R, T, can_bounds, self.nrays, self.split)
-
         ret = {
             'rgb': rgb,
             'ray_o': ray_o,
             'ray_d': ray_d,
             'near': near,
             'far': far,
-            'msk':msk
+            'msk':msk,
+            'mask_at_box': mask_at_box
         }
 
         R = cv2.Rodrigues(Rh)[0].astype(np.float32)

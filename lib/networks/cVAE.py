@@ -21,16 +21,19 @@ class Network(nn.Module):
 
         super(Network, self).__init__()
 
+         
         #encoder
-        
-        self.ec_ly1 = nn.ModuleList([nn.Linear(72 + time_dim, 64) for i in range(cfg.n_nodes)])
-        self.ec_ly21= nn.ModuleList([nn.Linear(64, 8) for i in range(cfg.n_nodes)])
-        self.ec_ly22= nn.ModuleList([nn.Linear(64, 8) for i in range(cfg.n_nodes)])
+        self.ec_ly1 = nn.Conv1d((72 + time_dim) * 128, 64 * 128, kernel_size= 1, groups =128)
+        self.ec_ly21= nn.Conv1d(64 * 128, 8 * 128, kernel_size=1, groups=128)
+        self.ec_ly22= nn.Conv1d(64 * 128, 8 * 128, kernel_size=1, groups=128)
        
+        
+        
         #decoder
-        self.dc_ly1= nn.ModuleList([nn.Linear(80, 64) for i in range(cfg.n_nodes)])
-        self.dc_ly21= nn.ModuleList([nn.Linear(64, 32) for i in range(cfg.n_nodes)])
-        self.dc_ly22= nn.ModuleList([nn.Linear(64, 3) for i in range(cfg.n_nodes)])
+        self.dc_ly1 = nn.Conv1d(80 * 128, 64 * 128, kernel_size= 1, groups =128)
+        self.dc_ly21= nn.Conv1d(64 * 128, 32 * 128, kernel_size=1, groups=128)
+        self.dc_ly22= nn.Conv1d(64 * 128, 3 * 128, kernel_size=1, groups=128)
+       
         self.actvn = nn.ReLU()
         self.actvn2 = nn.Sigmoid()  
         # nodes x s' x (32+xyz_dim)
@@ -65,14 +68,13 @@ class Network(nn.Module):
         #B x N_nodes x time_dim
         t_ped = t_ped.expand(nodes_n, batch_size, time_dim).permute(1, 0, 2)
         #B x N_nodes X (72 + time_dim)
-        encoder_in = torch.cat([poses, t_ped], dim = -1)
-        #nodes x batchs x 64
-        net = [self.actvn(self.ec_ly1[node_i](encoder_in[:,node_i,:])) for node_i in range(cfg.n_nodes)]
-        #nodes x batchs x 8 
-        mean = torch.stack([self.ec_ly21[node_i](net[node_i]) for node_i in range(cfg.n_nodes)], dim = 0)
-        std = torch.stack([(self.actvn2(self.ec_ly22[node_i](net[node_i]))) for node_i in range(cfg.n_nodes)], dim = 0)
-        
-        return mean, std
+        encoder_in = torch.cat([poses, t_ped], dim = -1).permute(1, 2, 0).reshape(nodes_n * (72 + time_dim), batch_size)
+        #nodes x 64 x batchs
+        net = self.actvn(self.ec_ly1(encoder_in))
+        #nodes x 8 x batchs
+        mean = self.ec_ly21(net).view(nodes_n, 8, batch_size).permute(0,2,1)
+        logvar = self.ec_ly22(net).view(nodes_n, 8, batch_size).permute(0, 2, 1)
+        return mean, logvar
     
     def decode(self, z, poses, w):
         '''
@@ -87,14 +89,23 @@ class Network(nn.Module):
         poses = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
         #B x N_nodes x 72
         poses = torch.mul(w, poses).view(batch_size,nodes_n,72)
-        #B x N_nodes x 80
-        input = torch.cat([poses, z.transpose(0, 1)], dim = -1)
-        #nodes x batchs x 64
-        net = [self.actvn(self.dc_ly1[node_i](input[:, node_i, :])) for node_i in range(cfg.n_nodes)]
-        ei = torch.stack([self.dc_ly21[node_i](net[node_i]) for node_i in range(cfg.n_nodes)],dim = 0)
-        delta_ni = torch.stack([self.dc_ly22[node_i](net[node_i]) for node_i in range(cfg.n_nodes)], dim = 0)
+        #N_nodes x 80 x batchs
+        input = torch.cat([poses, z.transpose(0, 1)], dim = -1).permute(1, 2, 0).reshape(nodes_n * 80, batch_size)
+        #N_nodes x 64 x batchs
+        net = self.actvn(self.dc_ly1(input))
+        ei = self.dc_ly21(net).view(nodes_n, 32, batch_size).permute(0, 2, 1)
+        delta_ni = self.dc_ly22(net).view(nodes_n, 3, batch_size).permute(0, 2, 1)
         #nodes x batches x (32, 3)
         return ei, delta_ni
+
+
+    def reparameterize(self, mean, logvar):
+        if self.training:
+            std = torch.exp(0.5 * logvar)
+            eps = torch.randn_like(std)
+            return eps.mul(std).add_(mean)
+        else:
+            return mean
     
     def Feature_field(self, ei, local_coords, mask, mark, s, s_max):
         '''
@@ -117,7 +128,7 @@ class Network(nn.Module):
         for i in range(local_coords.shape[0]): 
             input[i][:s[i]] = raw[mark == i]
         input = input.permute(0,2,1).reshape(nodes_n * (32 + xyz_dim), s_max)
-        #  nodes x (32 + xyz_dim) x S_max
+        # nodes x (32 + xyz_dim) x S_max
         net = self.actvn(self.f_ly1(input))
         net = self.actvn(self.f_ly2(net))
         net = self.actvn(self.f_ly3(net))
@@ -126,9 +137,6 @@ class Network(nn.Module):
         return f
 
 
-    def GaussianSample(self, mean, std):
-        #z: nodes x batchs x 8
-        return torch.normal(mean, std)
 
     def blend_feature(self, bweights, f):
         '''
@@ -143,6 +151,7 @@ class Network(nn.Module):
         #B x V x 256
         f_blend = torch.matmul(f, bweights[...,None]).squeeze(dim = -1)
         return f_blend 
+
     def Nerf(self, f):
         '''
         f: B x V x 256
@@ -196,6 +205,7 @@ class Network(nn.Module):
         #V x B x nodes_n x 3
         local_coords = coords_T - nodes_T - torch.transpose(nodes_delta, 0, 1)
         return local_coords.permute(2, 1, 0, 3)
+
     def forward(self, input, wpts, body):
         #transform sampled points from world coord to smpl coord
         batch_size = input['batch_size']
@@ -230,19 +240,14 @@ class Network(nn.Module):
         
         #s: nodes_n x B the number of pts under the nodes' influence
         t_ped = time_embedder(input['latent_index']).view(batch_size,-1)
-        mean, std = self.encode(t_ped, poses, w)
-        if self.training:
-            z = self.GaussianSample(mean, std)
-        elif cfg.mod == 'novel':
-            z = torch.zeros_like(mean)
-        else:
-            z = mean
+        mean, logvar = self.encode(t_ped, poses, w)
+        z = self.reparameterize(mean, logvar)
         #nodes x B x (32, 3)
         ei, nodes_delta = self.decode(z, poses, w)  
         if s_max == 0:
             f_blend = self.blend_feature(bweights, f)
             c, d = self.Nerf(f_blend)
-            return c, d, ei, nodes_delta, mean, std
+            return c, d, ei, nodes_delta, mean, logvar
       
         #nodes_n x B x V x 3
         local_coords = self.calculate_local_coords(wpts_ep, batch_nodes_T, nodes_delta, nodes_weights, j_transformed, body, poses, shapes, R, Th) #TODO High complexity
@@ -261,5 +266,5 @@ class Network(nn.Module):
         c, d = self.Nerf(f_blend)
         #ei, nodes_delta: nodes x batches x (32, 3)
         #mean, std: nodes x batchs x 8 
-        return c, d, ei, nodes_delta, mean, std
+        return c, d, ei, nodes_delta, mean, logvar
 

@@ -69,7 +69,7 @@ def test(cfg, network):
     trainer = make_trainer(cfg, network)
     val_loader = make_data_loader(cfg, is_train=False)
     evaluator = make_evaluator(cfg)
-    model_dir = os.path.join('data/trained_model/StructureNeRF/2048rays_novel_view/latest.pth')
+    model_dir = os.path.join('data/trained_model/StructureNeRF/1024rays_novel_view/latest.pth')
     trained_model = torch.load(model_dir)
     network.load_state_dict(trained_model['net'])
     epoch = trained_model['epoch'] + 1

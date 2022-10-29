@@ -38,11 +38,12 @@ class NetworkWrapper(nn.Module):
         #B X H x W x 3
         img_loss = self.img2mse(ret['rgb_map'][mask], batch['rgb'][mask])
         scalar_stats.update({'img_loss': img_loss})
-        normal_pred = Normal(ret['mean'], ret['std'])
-        normal_t = Normal(0, 1)
+        # normal_pred = Normal(ret['mean'], ret['logvar'])
+        # normal_t = Normal(0, 1)
+        kl_loss = -0.5 * torch.sum(1 + ret['logvar'] - ret['mean'].pow(2) - ret['logvar'].exp())
 
-        kl_loss = kl_divergence(normal_pred, normal_t)
-        kl_loss = torch.sum(kl_loss.reshape(-1, 1), dim = 0) 
+        # kl_loss = kl_divergence(normal_pred, normal_t)
+        # kl_loss = torch.sum(kl_loss.reshape(-1, 1), dim = 0) 
         scalar_stats.update({'kl_loss': kl_loss})
         trans_loss = torch.norm(ret['delta_nodes']) ** 2
         scalar_stats.update({'trans_loss': trans_loss})

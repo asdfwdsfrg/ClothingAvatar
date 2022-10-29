@@ -21,11 +21,11 @@ class Evaluator:
 
     def ssim_metric(self, img_pred, img_gt, batch):
         if not cfg.eval_whole_img:
-            mask_at_box = batch['mask_at_box'][0].detach().cpu().numpy()
+            mask = batch['msk'][0].detach().cpu().numpy()
             H, W = int(cfg.H * cfg.ratio), int(cfg.W * cfg.ratio)
-            mask_at_box = mask_at_box.reshape(H, W)
+            mask = mask.reshape(H, W)
             # crop the object region
-            x, y, w, h = cv2.boundingRect(mask_at_box.astype(np.uint8))
+            x, y, w, h = cv2.boundingRect(mask.astype(np.uint8))
             img_pred = img_pred[y:y + h, x:x + w]
             img_gt = img_gt[y:y + h, x:x + w]
 
@@ -49,16 +49,15 @@ class Evaluator:
     def evaluate(self, output, batch):
         rgb_pred = output['rgb_map'][0].detach().cpu().numpy()
         rgb_gt = batch['rgb'][0].detach().cpu().numpy()
-
-        mask_at_box = batch['mask_at_box'][0].detach().cpu().numpy()
+        mask = batch['msk'][0].detach().cpu().numpy()
         H, W = int(cfg.H * cfg.ratio), int(cfg.W * cfg.ratio)
-        mask_at_box = mask_at_box.reshape(H, W)
+        mask = mask.reshape(H, W)
         # convert the pixels into an image
         white_bkgd = int(cfg.white_bkgd)
         img_pred = np.zeros((H, W, 3)) + white_bkgd
-        img_pred[mask_at_box] = rgb_pred
+        img_pred[mask] = rgb_pred
         img_gt = np.zeros((H, W, 3)) + white_bkgd
-        img_gt[mask_at_box] = rgb_gt
+        img_gt[mask] = rgb_gt
 
         if cfg.eval_whole_img:
             rgb_pred = img_pred

@@ -106,12 +106,13 @@ class Trainer(object):
 
     def calculate_loss(self, ret, batch):
         img2mse = lambda x, y : torch.sum(torch.sum((x - y) ** 2, dim = 1),dim=0)
-        mask = batch['mask_at_box']
+        # mask = batch['msk']
         # H, W = int(cfg.H * cfg.ratio), int(cfg.W * cfg.ratio)
         # mask = mask.reshape(H, W)
         # img_pred = np.zeros((H, W, 3))
         # img_gt = np.zeros((H, W, 3))
         
+        mask = batch['msk']
         scalar_stats = {}
         loss = 0
         lambda_img_loss = cfg.lambda_img_loss
@@ -120,10 +121,11 @@ class Trainer(object):
         lambda_kl = cfg.lambda_kl
         img_loss = img2mse(ret['rgb_map'], batch['rgb'])
         scalar_stats.update({'img_loss': img_loss})
-        normal_pred = Normal(ret['mean'], ret['std'])
-        normal_t = Normal(0, 1)
-        kl_loss = kl_divergence(normal_pred, normal_t)
-        kl_loss = torch.sum(kl_loss.view(-1, 1), dim = 0)
+        # normal_pred = Normal(ret['mean'], ret['std'])
+        # normal_t = Normal(0, 1)
+        # kl_loss = kl_divergence(normal_pred, normal_t)
+        # kl_loss = torch.sum(kl_loss.view(-1, 1), dim = 0)
+        kl_loss = -0.5 * torch.sum(1 + ret['logvar'] - ret['mean'].pow(2) - ret['logvar'].exp())
         trans_loss = torch.norm(ret['delta_nodes']) ** 2
         ebd_loss = torch.norm(ret['embedding']) ** 2
         loss += lambda_img_loss * img_loss + lambda_ebd * ebd_loss + lambda_kl * kl_loss + lambda_trans * trans_loss
@@ -152,7 +154,7 @@ class Trainer(object):
             o = {}
             o['rgb_map'] = list()
             o['mean'] = list()
-            o['std'] = list()
+            o['logvar'] = list()
             o['embedding'] = list()
             o['delta_nodes'] = list()
             output = {}
@@ -169,12 +171,12 @@ class Trainer(object):
                     # lp.print_stats()
                     o['rgb_map'].append(o_i['rgb_map'])
                     o['mean'].append(o_i['mean'])
-                    o['std'].append(o_i['std'])
+                    o['logvar'].append(o_i['logvar'])
                     o['embedding'].append(o_i['embedding'])
                     o['delta_nodes'].append(o_i['delta_nodes'])
             output['rgb_map'] = torch.cat(o['rgb_map'], dim = 1)
             output['mean'] = torch.cat(o['mean'], dim = 1)
-            output['std'] = torch.cat(o['std'], dim = 1)
+            output['logvar'] = torch.cat(o['logvar'], dim = 1)
             output['embedding'] = torch.cat(o['embedding'], dim = 1)
             output['delta_nodes'] = torch.cat(o['delta_nodes'], dim = 1)
             ret, loss, loss_stats, image_stats = self.calculate_loss(output, batch) 

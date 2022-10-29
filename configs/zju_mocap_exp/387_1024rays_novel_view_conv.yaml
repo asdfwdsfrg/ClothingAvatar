@@ -1,14 +1,14 @@
 task: 'StructureNeRF'
-gpus: [6]
+gpus: [5]
 # mod: 'train'
 # mod: 'test'
 mod: 'train'
-exp_name : '2048rays_novel_view_conv'
+exp_name : '1024rays_novel_view_conv'
 # resume : 'True'
-train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset_msk'
-train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset_msk.py'
-test_dataset_module: 'lib.datasets.light_stage.multi_view_dataset_msk'
-test_dataset_path: 'lib/datasets/light_stage/multi_view_dataset_msk.py'
+train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
+train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
+test_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
+test_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
 trained_model_dir: 'data/trained_model'
 network_module: 'lib.networks.cVAE'
 network_path: 'lib/networks/cVAE.py'
@@ -39,7 +39,7 @@ test_dataset:
     split: 'test'
 
 train:
-    batch_size: 2
+    batch_size: 4
     collator: ''
     lr: 5e-4
     weight_decay: 0
@@ -80,7 +80,7 @@ lambda_ebd: 0.1
 lambda_kl: 0.00001
 N_samples: 64
 N_importance: 128
-N_rand: 2048
+N_rand: 1024
 L_rate: 0.0005
 beta1: 0.9
 beta2: 0.999

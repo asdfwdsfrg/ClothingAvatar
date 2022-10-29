@@ -164,13 +164,17 @@ def sample_ray(img, msk, K, R, T, bounds, nrays, split):
         msk = msk.flatten().astype(np.bool8)
         ray_o = ray_o.reshape(-1, 3).astype(np.float32)
         ray_d = ray_d.reshape(-1, 3).astype(np.float32)
+        near_ = np.zeros([msk.shape[0]], dtype=(np.float32))
+        far_ = np.zeros([msk.shape[0]], dtype=(np.float32))
         near, far, mask_at_box = get_near_far(bounds, ray_o, ray_d)
-        near = near.astype(np.float32)
-        far = far.astype(np.float32)
-        rgb = rgb[msk]
         ray_o = ray_o[msk]
         ray_d = ray_d[msk]
+        near_[mask_at_box] = near.astype(np.float32)
+        far_[mask_at_box] = far.astype(np.float32)
+        near = near_[msk]
+        far = far_[msk]
         coord = np.zeros([len(rgb), 2]).astype(np.int64)
+        rgb = rgb[msk]
 
     return rgb, ray_o, ray_d, near, far, coord, mask_at_box, msk
 

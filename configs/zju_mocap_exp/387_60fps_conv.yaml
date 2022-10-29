@@ -1,14 +1,14 @@
 task: 'StructureNeRF'
-gpus: [6]
+gpus: [5]
 # mod: 'train'
 # mod: 'test'
 mod: 'train'
 exp_name : '60fps'
 resume : 'True'
-train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset_msk'
-train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset_msk.py'
-test_dataset_module: 'lib.datasets.light_stage.multi_view_dataset_msk'
-test_dataset_path: 'lib/datasets/light_stage/multi_view_dataset_msk.py'
+train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
+train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
+test_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
+test_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
 trained_model_dir: 'data/trained_model'
 network_module: 'lib.networks.cVAE'
 network_path: 'lib/networks/cVAE.py'
@@ -58,7 +58,7 @@ test:
 n_nodes: 128
 ep_iter: 500
 save_ep: 10
-eval_ep: 100
+eval_ep: 10
 
 vertices: 'new_vertices'
 params: 'new_params'
