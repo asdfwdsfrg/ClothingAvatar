@@ -3,7 +3,7 @@ gpus: [5]
 # mod: 'train'
 # mod: 'test'
 mod: 'train'
-exp_name : '60fps'
+exp_name : 'transformd_nodes_T'
 resume : 'True'
 train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
 train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
@@ -39,7 +39,7 @@ test_dataset:
     split: 'test'
 
 train:
-    batch_size: 4
+    batch_size: 2
     collator: ''
     lr: 5e-4
     weight_decay: 0

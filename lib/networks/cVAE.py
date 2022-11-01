@@ -53,7 +53,7 @@ class Network(nn.Module):
 
     def encode(self, t_ped, poses, w):
         '''
-        poses: batch x 72
+        poses: batch x nodes_n x 24 x 3
         t_ped: batch x time_dim
         mean, std:  Batchs x nodes x 8
         w: attention_map : 128 x 24
@@ -61,8 +61,6 @@ class Network(nn.Module):
         batch_size = poses.shape[0]
         nodes_n = cfg.n_nodes
         #B x N_nodes x 24 X 3
-        w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
-        poses = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
         #B x N_nodes x 72
         poses = torch.mul(w, poses).view(batch_size,nodes_n,72)
         #B x N_nodes x time_dim
@@ -84,9 +82,6 @@ class Network(nn.Module):
         '''
         batch_size = poses.shape[0]
         nodes_n = cfg.n_nodes
-        #B x N_nodes x 24 X 3
-        w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
-        poses = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
         #B x N_nodes x 72
         poses = torch.mul(w, poses).view(batch_size,nodes_n,72)
         #N_nodes x 80 x batchs
@@ -187,7 +182,7 @@ class Network(nn.Module):
             bweights[i] = torch.max(nodes_influ, torch.tensor(0).float())
         return bweights, mask
 
-    def calculate_local_coords(self, pts, nodes_T, nodes_delta, nodes_weights, J, body, poses, shapes, R, Th):
+    def calculate_local_coords(self, wpts, nodes_T, nodes_weights, J, body, poses, shapes, R, Th):
         """get local_coords"""
         '''
             pts: nodes_n x B x V x  3
@@ -200,31 +195,42 @@ class Network(nn.Module):
                 local_coords: nodes_n x B x V x 4
         '''
         #V x B x nodes_n x 3
-        pts = pts.permute(2,1,0,3)
-        coords_T, j_transformed = body.get_lbs(poses, shapes, nodes_weights, pts, joints = J, Rh = R, Th = Th, inverse = True)
+        nodes_n = cfg.n_nodes
+        wpts = wpts.expand(nodes_n, wpts.shape[0], wpts.shape[1], wpts.shape[2])
+        wpts = wpts.permute(2,1,0,3)
+        coords_T, j_transformed = body.get_lbs(poses, shapes, nodes_weights, wpts, joints = J, Rh = R, Th = Th, inverse = True)
         #V x B x nodes_n x 3
-        local_coords = coords_T - nodes_T - torch.transpose(nodes_delta, 0, 1)
+        local_coords = coords_T - nodes_T 
         return local_coords.permute(2, 1, 0, 3)
 
     def forward(self, input, wpts, body):
         #transform sampled points from world coord to smpl coord
         batch_size = input['batch_size']
+        nodes_n = cfg.n_nodes
         #B x V x 3
+        weights = body.basis['weights']
+        nodes_ind = body.basis['nodes_ind']
+        nodes_weights= weights[nodes_ind]
         wpts = wpts.view(batch_size, -1, 3)
         wpts = self.pts_to_can_pts(wpts, input)
         params = input['params']
         poses = params['poses'].squeeze(dim = -2)
+        poses_exp = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
+        w = torch.matmul(body.attention_map, nodes_weights[..., None]).squeeze(dim=-1)
+        w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
         shapes = params['shapes']
-        nodes_n = cfg.n_nodes
-        weights = body.basis['weights']
         R = input['R']
         Th = input['Th']
-        nodes_ind = body.basis['nodes_ind']
         #nodes in T pose
         nodes_T = body.basis['v_shaped'][nodes_ind]
         batch_nodes_T = nodes_T.expand(batch_size, nodes_T.shape[-2], nodes_T.shape[-1])
-        nodes_weights = weights[nodes_ind]
-        w = torch.matmul(body.attention_map, nodes_weights[..., None]).squeeze(dim=-1)
+        t_ped = time_embedder(input['latent_index']).view(batch_size,-1)
+        mean, logvar = self.encode(t_ped, poses_exp, w)
+        z = self.reparameterize(mean, logvar)
+        #nodes x B x (32, 3)
+        ei, nodes_delta = self.decode(z, poses_exp, w)  
+        batch_nodes_T = batch_nodes_T + nodes_delta.transpose(0, 1) 
+
         batch_nodes_posed, j_transformed = body.get_lbs(poses, shapes, nodes_weights, batch_nodes_T, Rh = R, Th = Th)
         #B X V X 3
         #bweights: nodes_n X B X V  the nodes influence on each vertex
@@ -232,29 +238,22 @@ class Network(nn.Module):
         bweights, mask = self.blend_weights(wpts, batch_nodes_posed)
         pts_nodes_ind = torch.range(0, 127, dtype=int,device=wpts.device)
         pts_nodes_ind = pts_nodes_ind.expand(batch_size, wpts.shape[1], cfg.n_nodes).permute(2, 0, 1)[mask]
-        wpts_ep = wpts.expand(nodes_n, wpts.shape[0], wpts.shape[1], wpts.shape[2])
         #s[i]: the number of pts influenced by nodes_i
         f = torch.zeros(nodes_n, batch_size, wpts.shape[-2], 256, device = wpts.device)
         s = torch.sum(torch.sum(mask, dim = 2), dim = 1)
         s_max = torch.max(s)
-        
         #s: nodes_n x B the number of pts under the nodes' influence
-        t_ped = time_embedder(input['latent_index']).view(batch_size,-1)
-        mean, logvar = self.encode(t_ped, poses, w)
-        z = self.reparameterize(mean, logvar)
-        #nodes x B x (32, 3)
-        ei, nodes_delta = self.decode(z, poses, w)  
         if s_max == 0:
             f_blend = self.blend_feature(bweights, f)
             c, d = self.Nerf(f_blend)
             return c, d, ei, nodes_delta, mean, logvar
       
         #nodes_n x B x V x 3
-        local_coords = self.calculate_local_coords(wpts_ep, batch_nodes_T, nodes_delta, nodes_weights, j_transformed, body, poses, shapes, R, Th) #TODO High complexity
+        local_coords = self.calculate_local_coords(wpts, batch_nodes_T, nodes_weights, j_transformed, body, poses, shapes, R, Th) #TODO High complexity
         #n x b x v x 256
          #
         f_hit = self.Feature_field(ei, xyz_embedder(local_coords), mask, pts_nodes_ind, s, s_max) #TODO high complexity 75%
-        
+         
         mask_f = torch.zeros(f_hit.shape[0], f_hit.shape[1], dtype=bool, device = f.device)
         for i, pts_num in enumerate(s):
             mask_f[i][:pts_num] = True
