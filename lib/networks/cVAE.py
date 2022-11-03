@@ -45,7 +45,7 @@ class Network(nn.Module):
         self.f_ly4 = nn.Conv1d(64 * 128, 256 * 128, kernel_size=1, groups = 128)
 
         #Nerf color
-        self.c_ly1 = nn.Linear(256, 64)
+        self.c_ly1 = nn.Linear(256 + view_dim, 64)
         self.c_ly2 = nn.Linear(64, 3)
 
         #NerF density
@@ -88,8 +88,8 @@ class Network(nn.Module):
         input = torch.cat([poses, z.transpose(0, 1)], dim = -1).permute(1, 2, 0).reshape(nodes_n * 80, batch_size)
         #N_nodes x 64 x batchs
         net = self.actvn(self.dc_ly1(input))
-        ei = self.dc_ly21(net).view(nodes_n, 32, batch_size).permute(0, 2, 1)
-        delta_ni = self.dc_ly22(net).view(nodes_n, 3, batch_size).permute(0, 2, 1)
+        ei = self.actvn(self.dc_ly21(net)).view(nodes_n, 32, batch_size).permute(0, 2, 1)
+        delta_ni = self.actvn(self.dc_ly22(net)).view(nodes_n, 3, batch_size).permute(0, 2, 1)
         #nodes x batches x (32, 3)
         return ei, delta_ni
 
@@ -147,21 +147,34 @@ class Network(nn.Module):
         f_blend = torch.matmul(f, bweights[...,None]).squeeze(dim = -1)
         return f_blend 
 
-    def Nerf(self, f):
+    def Nerf(self, f, viewdir):
         '''
         f: B x V x 256
+        viewdir: B x n_rand x view_dim
         '''
-        netc = self.actvn(self.c_ly1(f))
-        c = self.c_ly2(netc)
+        n_samples = cfg.N_samples
+        rays = round(f.shape[1] / n_samples)
+        viewdir = viewdir.expand(n_samples, f.shape[0],rays, view_dim).permute(1, 2, 0, 3).reshape(f.shape[0], f.shape[1], view_dim)
+        input = torch.cat([f, viewdir], dim = -1) 
+        netc = self.actvn(self.c_ly1(input))
+        c = torch.sigmoid(self.c_ly2(netc))
         d = self.actvn(self.d_ly1(f))
         return c, d
 
-    def pts_to_can_pts(self, pts, sp_input):
+    def wpts_to_smpl_pts(self, pts, sp_input):
         """transform pts from the world coordinate to the smpl coordinate"""
         Th = sp_input['Th']
         pts = pts - Th
         R = sp_input['R']
         pts = torch.matmul(pts, R)
+        return pts
+
+    def world_dirs_to_pose_dirs(self, wdirs, Rh):
+        """
+        wdirs: n_batch, n_points, 3
+        Rh: n_batch, 3, 3
+        """
+        pts = torch.matmul(wdirs, Rh)
         return pts
 
     def blend_weights(self, wpts, nodes_posed):
@@ -198,71 +211,72 @@ class Network(nn.Module):
         nodes_n = cfg.n_nodes
         wpts = wpts.expand(nodes_n, wpts.shape[0], wpts.shape[1], wpts.shape[2])
         wpts = wpts.permute(2,1,0,3)
-        coords_T, j_transformed = body.get_lbs(poses, shapes, nodes_weights, wpts, joints = J, Rh = R, Th = Th, inverse = True)
+        coords_T, j_transformed = body.get_lbs(poses, shapes, nodes_weights, wpts, joints = J, inverse = True)
         #V x B x nodes_n x 3
         local_coords = coords_T - nodes_T 
         return local_coords.permute(2, 1, 0, 3)
 
-    def forward(self, input, wpts, body):
+    def forward(self, input, wpts, viewdir, body):
         #transform sampled points from world coord to smpl coord
         batch_size = input['batch_size']
         nodes_n = cfg.n_nodes
         #B x V x 3
-        weights = body.basis['weights']
-        nodes_ind = body.basis['nodes_ind']
-        nodes_weights= weights[nodes_ind]
-        wpts = wpts.view(batch_size, -1, 3)
-        wpts = self.pts_to_can_pts(wpts, input)
-        params = input['params']
-        poses = params['poses'].squeeze(dim = -2)
-        poses_exp = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
-        w = torch.matmul(body.attention_map, nodes_weights[..., None]).squeeze(dim=-1)
-        w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
-        shapes = params['shapes']
         R = input['R']
         Th = input['Th']
-        #nodes in T pose
+        params = input['params']
+        shapes = params['shapes']
+        weights = body.basis['weights']
+        nodes_ind = body.basis['nodes_ind']
         nodes_T = body.basis['v_shaped'][nodes_ind]
+        nodes_weights= weights[nodes_ind]
+        wpts = wpts.view(batch_size, -1, 3)
+        wpts = self.wpts_to_smpl_pts(wpts, input)
+        wviewdir = self.world_dirs_to_pose_dirs(viewdir, R)
+        poses = params['poses'].squeeze(dim = -2)
+        poses_exp = poses.expand(nodes_n, batch_size, 72).permute(1, 0, 2).reshape(batch_size, nodes_n, 24, 3)
+        with torch.no_grad():
+            w = torch.matmul(body.attention_map, nodes_weights[..., None]).squeeze(dim=-1)
+            w = w.expand(batch_size, 3, 128, 24).permute(0, 2, 3, 1)
+        t_ped = time_embedder(input['latent_index']).view(batch_size, -1)
+        #nodes in T pose
         batch_nodes_T = nodes_T.expand(batch_size, nodes_T.shape[-2], nodes_T.shape[-1])
-        t_ped = time_embedder(input['latent_index']).view(batch_size,-1)
         mean, logvar = self.encode(t_ped, poses_exp, w)
         z = self.reparameterize(mean, logvar)
         #nodes x B x (32, 3)
         ei, nodes_delta = self.decode(z, poses_exp, w)  
         batch_nodes_T = batch_nodes_T + nodes_delta.transpose(0, 1) 
-
-        batch_nodes_posed, j_transformed = body.get_lbs(poses, shapes, nodes_weights, batch_nodes_T, Rh = R, Th = Th)
-        #B X V X 3
-        #bweights: nodes_n X B X V  the nodes influence on each vertex
-        #mask: nodes_n x B x V
+        batch_nodes_posed, j_transformed = body.get_lbs(poses, shapes, nodes_weights, batch_nodes_T)
         bweights, mask = self.blend_weights(wpts, batch_nodes_posed)
-        pts_nodes_ind = torch.range(0, 127, dtype=int,device=wpts.device)
-        pts_nodes_ind = pts_nodes_ind.expand(batch_size, wpts.shape[1], cfg.n_nodes).permute(2, 0, 1)[mask]
+        with torch.no_grad():
+            pts_nodes_ind = torch.range(0, 127, dtype=int,device=wpts.device)
+            pts_nodes_ind = pts_nodes_ind.expand(batch_size, wpts.shape[1], cfg.n_nodes).permute(2, 0, 1)[mask]
+        local_coords = self.calculate_local_coords(wpts, batch_nodes_T, nodes_weights, j_transformed, body, poses, shapes, R, Th) #TODO High complexity
         #s[i]: the number of pts influenced by nodes_i
         f = torch.zeros(nodes_n, batch_size, wpts.shape[-2], 256, device = wpts.device)
         s = torch.sum(torch.sum(mask, dim = 2), dim = 1)
         s_max = torch.max(s)
-        #s: nodes_n x B the number of pts under the nodes' influence
+            #s: nodes_n x B the number of pts under the nodes' influence
         if s_max == 0:
             f_blend = self.blend_feature(bweights, f)
-            c, d = self.Nerf(f_blend)
+            c, d = self.Nerf(f_blend, view_embedder(wviewdir))
             return c, d, ei, nodes_delta, mean, logvar
-      
         #nodes_n x B x V x 3
-        local_coords = self.calculate_local_coords(wpts, batch_nodes_T, nodes_weights, j_transformed, body, poses, shapes, R, Th) #TODO High complexity
+        #B X V X 3
+        #bweights: nodes_n X B X V  the nodes influence on each vertex
+        #mask: nodes_n x B x V
+  
         #n x b x v x 256
          #
         f_hit = self.Feature_field(ei, xyz_embedder(local_coords), mask, pts_nodes_ind, s, s_max) #TODO high complexity 75%
-         
-        mask_f = torch.zeros(f_hit.shape[0], f_hit.shape[1], dtype=bool, device = f.device)
-        for i, pts_num in enumerate(s):
-            mask_f[i][:pts_num] = True
+        with torch.no_grad():
+            mask_f = torch.zeros(f_hit.shape[0], f_hit.shape[1], dtype=bool, device = f.device)
+            for i, pts_num in enumerate(s):
+                mask_f[i][:pts_num] = True
         f_hit = f_hit[mask_f]
         f[mask] = f_hit
-
         f_blend = self.blend_feature(bweights, f)
-        #batchs x v x 3,1
-        c, d = self.Nerf(f_blend)
+            #batchs x v x 3,1
+        c, d = self.Nerf(f_blend, view_embedder(wviewdir))
         #ei, nodes_delta: nodes x batches x (32, 3)
         #mean, std: nodes x batchs x 8 
         return c, d, ei, nodes_delta, mean, logvar

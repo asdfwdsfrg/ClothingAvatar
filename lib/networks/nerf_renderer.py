@@ -25,7 +25,6 @@ class Renderer:
             # stratified samples in those intervals
             t_rand = torch.rand(z_vals.shape).to(upper)
             z_vals = lower + (upper - lower) * t_rand
-
         pts = ray_o[:, :, None] + ray_d[:, :, None] * z_vals[..., None]
 
         return pts, z_vals
@@ -80,23 +79,19 @@ class Renderer:
         return ret
 
     def render(self, batch):
+        #B x N_rand x 3
         ray_o = batch['ray_o']
         ray_d = batch['ray_d']
         near = batch['near']
         far = batch['far']
-        params = batch['params']
-        sh = ray_o.shape
-
-        
         input = self.prepare_input(batch)
         wpts, z_vals = self.get_sampling_points(ray_o, ray_d, near, far)
-        #batchs X R_ray X N_sampled X 3
-        #calculate color & density
+        viewdir = ray_d / torch.norm(ray_d, dim=2, keepdim=True)
         # lp = LineProfiler()
         
         # lp_wrapper = lp(self.net.forward) 
         # c, d, ei, nodes_delta, mean, std = lp_wrapper(input, wpts, self.body)
-        c, d, ei, nodes_delta, mean, logvar= self.net(input, wpts, self.body)
+        c, d, ei, nodes_delta, mean, logvar= self.net(input, wpts, viewdir, self.body)
         
         # lp.print_stats()
         # volume rendering for each pixel

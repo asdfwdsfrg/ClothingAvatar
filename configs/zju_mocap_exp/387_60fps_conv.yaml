@@ -1,9 +1,9 @@
 task: 'StructureNeRF'
-gpus: [5]
+gpus: [3]
 # mod: 'train'
 # mod: 'test'
 mod: 'train'
-exp_name : 'transformd_nodes_T'
+exp_name : 'transformd_nodes_T_with_view'
 resume : 'True'
 train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
 train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
@@ -58,7 +58,7 @@ test:
 n_nodes: 128
 ep_iter: 500
 save_ep: 10
-eval_ep: 10
+eval_ep: 20
 
 vertices: 'new_vertices'
 params: 'new_params'
@@ -66,8 +66,8 @@ params: 'new_params'
 i_embed: 0
 
 # encoder dim
-xyz_res: 10
-time_res: 4
+xyz_res: 6
+time_res: 12
 view_res: 4
 raw_noise_std: 0
 

@@ -101,11 +101,6 @@ class BodyModel(object):
                 weights,
                 pts,
                 joints = None,
-                Rh=None,
-                Th=None,
-                return_verts=True,
-                return_tensor=True,
-                scale=1,
                 new_params=False,
                 inverse = False):
         """Do LBS or Inverse LBS 
@@ -116,9 +111,6 @@ class BodyModel(object):
             weigths (B, V, 24)
             pts(... x B x V x 3)
             joints(B x 24 x 3) : default the shaped T pose joints
-            Rh (B, 3): global orientation
-            Th (B, 3): global translation
-            return_verts (bool, optional): if True return (6890, 3). Defaults to False.
         """
         if 'torch' not in str(type(poses)):
             dtype, device = self.dtype, self.device
@@ -127,23 +119,8 @@ class BodyModel(object):
             Rh = to_tensor(Rh, dtype, device)
             Th = to_tensor(Th, dtype, device)
         bn = poses.shape[0]
-        rot = Rh
-        if Rh is None:
-            Rh = torch.zeros(bn, 3, device=poses.device)
-            rot = batch_rodrigues(Rh)
-        if Th is None:
-            Th = torch.zeros(bn, 3, device = poses.device)
-            Th = Th.unsqueeze(dim = 0)
-        transl = Th.unsqueeze(dim=1)
-        if shapes.shape[0] < bn:
-            shapes = shapes.expand(bn, -1)
         if joints is None:
             joints = self.basis['J_shaped'].expand(bn, 24, 3)
-        # if inverse:
-        #     print(rot.shape, pts.shape)
-        #     pts = torch.matmul(rot.transpose(1,2) * scale, pts - transl)
-        #     joints = torch.matmul(rot.transpose(1,2) * scale, joints - transl)
-        # if return_verts:
         vertices, j_transformed = lbs(shapes,
                                 poses,
                                 pts,
@@ -156,9 +133,4 @@ class BodyModel(object):
                                 new_params=new_params,
                                 dtype=self.dtype,
                                 inverse = inverse)
-        # vertices = (torch.matmul(vertices, rot.transpose(1, 2)) * scale + transl)[0]
-        # j_transformed = (torch.matmul(j_transformed, rot.transpose(1, 2)) * scale + transl)[0]
-        # if not return_tensor:
-            # vertices = vertices.detach().cpu().numpy()
-            # transl = transl.detach().cpu().numpy()
         return vertices, j_transformed
