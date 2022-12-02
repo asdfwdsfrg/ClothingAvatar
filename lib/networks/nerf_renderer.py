@@ -29,23 +29,6 @@ class Renderer:
 
         return pts, z_vals
 
-    def prepare_input(self, batch):
-        sp_input = {}
-
-        sh = batch['rgb'].shape
-        # idx = [torch.full([sh[1]], i) for i in range(sh[0])] 
-        # idx = torch.cat(idx).to(batch['coord'])
-        # coord = batch['coord'].view(-1, sh[-1])
-        # sp_input['coord'] = torch.cat([idx[:, None], coord], dim=1)
-        sp_input['batch_size'] = sh[0]
-        sp_input['bounds'] = batch['bounds']
-        sp_input['R'] = batch['R']
-        sp_input['Th'] = batch['Th']
-        sp_input['params'] = batch['params']
-        sp_input['latent_index'] = batch['latent_index']
-
-        return sp_input
-
     def get_density_color(self, wpts, viewdir, raw_decoder):
         n_batch, n_pixel, n_sample = wpts.shape[:3]
         wpts = wpts.view(n_batch, n_pixel * n_sample, -1)
@@ -84,15 +67,12 @@ class Renderer:
         ray_d = batch['ray_d']
         near = batch['near']
         far = batch['far']
-        input = self.prepare_input(batch)
         wpts, z_vals = self.get_sampling_points(ray_o, ray_d, near, far)
         viewdir = ray_d / torch.norm(ray_d, dim=2, keepdim=True)
         # lp = LineProfiler()
-        
         # lp_wrapper = lp(self.net.forward) 
-        # c, d, ei, nodes_delta, mean, std = lp_wrapper(input, wpts, self.body)
-        c, d, ei, nodes_delta, mean, logvar= self.net(input, wpts, viewdir, self.body)
-        
+        # c, d, ei, nodes_delta, mean, logvar= lp_wrapper(batch, wpts, viewdir, self.body)
+        c, d, ei, nodes_delta, mean, logvar= self.net(batch, wpts, viewdir, self.body)
         # lp.print_stats()
         # volume rendering for each pixel
         n_batch, n_pixel = ray_o.shape[:2]

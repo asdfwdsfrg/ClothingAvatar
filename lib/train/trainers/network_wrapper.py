@@ -10,7 +10,7 @@ from lib.config import cfg
 from lib.networks import nerf_renderer
 from lib.networks.body_model import BodyModel
 from lib.train import make_optimizer
-
+from line_profiler import LineProfiler
 
 class NetworkWrapper(nn.Module):
     def __init__(self, net):
@@ -26,7 +26,12 @@ class NetworkWrapper(nn.Module):
         self.img2mse = lambda x, y : torch.sum(torch.sum((x - y) ** 2, dim = 1),dim=0)
 
     def forward(self, batch):
+        
+        # lp = LineProfiler()
+        # lp_wrapper = lp(self.renderer.render) 
+        # ret = lp_wrapper(batch)
         ret = self.renderer.render(batch)
+        # lp.print_stats()
         scalar_stats = {}
         image_stats = {}
         loss = 0

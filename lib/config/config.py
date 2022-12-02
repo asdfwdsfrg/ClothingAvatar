@@ -80,7 +80,8 @@ cfg.train.optim = 'adam'
 cfg.train.lr = 1e-4
 cfg.train.weight_decay = 0
 
-cfg.train.scheduler = CN({'type': 'multi_step', 'milestones': [80, 120, 200, 240], 'gamma': 0.5})
+# cfg.train.scheduler = CN({'type': 'multi_step', 'milestones': [80, 120, 200, 240], 'gamma': 0.5})
+cfg.train.scheduler = CN({'type': 'exponential', 'decay_epochs': 40, 'gamma': 0.98})
 
 cfg.train.batch_size = 4
 

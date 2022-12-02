@@ -63,9 +63,9 @@ class Trainer(object):
         for iteration, batch in enumerate(data_loader):
             data_time = time.time() - end
             iteration = iteration + 1
-
             batch = self.to_cuda(batch)
             output, loss, loss_stats, image_stats= self.network(batch)
+
             # training stage: loss; optimizer; scheduler
             optimizer.zero_grad()
             loss = loss.mean()

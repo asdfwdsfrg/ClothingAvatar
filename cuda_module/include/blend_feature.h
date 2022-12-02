@@ -1,9 +1,3 @@
-void launch_add2(float *c,
-                 const float *nodes,
-                 const float *pts,
-                 const float r,
-                 int n_nodes);
-//given posed nodes & sample_d pts 
-//every nodes has its‘ influence range r
-//first find the number of pts in side nodes_i's field , marked as si
-//then find the maximum s' = max(s1, s2, si)
+void pts_hit(float *pts, bool *mask, float *hits_pts, int n_nodes, int batches, int pts_num, int s_max);
+void pts_put(float *f, int *ind, float *f_target, int f_dim, int n_nodes, int batches, int pts_num, int s_max);
+

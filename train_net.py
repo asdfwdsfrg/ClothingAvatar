@@ -42,7 +42,7 @@ def train(cfg, network):
         recorder.epoch = epoch
         if cfg.distributed:
             train_loader.batch_sampler.sampler.set_epoch(epoch)
-
+        
         trainer.train(epoch, train_loader, optimizer, recorder)
         scheduler.step()
 
