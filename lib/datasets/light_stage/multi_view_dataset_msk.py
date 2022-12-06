@@ -71,11 +71,11 @@ class Dataset(data.Dataset):
                                      '{}.npy'.format(i))
         xyz = np.load(vertices_path).astype(np.float32)
         # obtain the original bounds for point sampling
-        min_xyz = np.min(xyz, axis=0)
+        min_xyz = np.min(xyz, axis=0) 
         max_xyz = np.max(xyz, axis=0)
         if cfg.big_box:
-            min_xyz -= 0.05
-            max_xyz += 0.05
+             min_xyz -= 0.05
+             max_xyz += 0.05
         else:
             min_xyz[2] -= 0.05
             max_xyz[2] += 0.05

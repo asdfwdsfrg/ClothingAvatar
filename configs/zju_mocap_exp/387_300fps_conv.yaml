@@ -1,8 +1,8 @@
 task: 'StructureNeRF'
-gpus: [3]
+gpus: [7]
 # mod: 'test'
 mod: 'train'
-exp_name : 'transformd_nodes_T_with_view_cuda'
+exp_name : 'cuda_test'
 resume : 'True'
 train_dataset_module: 'lib.datasets.light_stage.multi_view_dataset'
 train_dataset_path: 'lib/datasets/light_stage/multi_view_dataset.py'
@@ -47,7 +47,7 @@ train:
         type: 'exponential'
         gamma: 0.98
         decay_epochs: 40
-    num_workers: 8
+    num_workers: 16
 
 test:
     sampler: 'FrameSampler'
@@ -58,6 +58,7 @@ n_nodes: 128
 ep_iter: 500
 save_ep: 10
 eval_ep: 50
+# big_box: 'True'
 
 vertices: 'new_vertices'
 params: 'new_params'
@@ -79,7 +80,7 @@ lambda_ebd: 0.1
 lambda_kl: 0.00001
 N_samples: 64
 N_importance: 2048
-N_rand: 1024
+N_rand: 2048
 beta1: 0.9
 beta2: 0.999
 

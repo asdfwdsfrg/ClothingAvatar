@@ -9,8 +9,8 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "console": "e",
-            "justMyCode": false
+            "stopOnEntry": false,
+            "justMyCode":true,
         }
     ]
 }
